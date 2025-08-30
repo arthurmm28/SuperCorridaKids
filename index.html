@@ -136,91 +136,123 @@
             <ul id="listaVagas">
                 <!-- Vagas serão atualizadas via JS -->
             </ul>
+            <p id="erroVagas" class="alerta"></p>
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+        const supabaseUrl = 'https://ciynopzakjblzavqxomv.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpeW5vcHpha2pibHphdnF4b212Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MTQxNjEsImV4cCI6MjA3MjA5MDE2MX0.KyhWkYsMj7Fhdh6Hfb0CamfqpiD2IwCuer7B1W-AvFA'
+        const supabase = createClient(supabaseUrl, supabaseKey)
+
         const form = document.getElementById('cadastroForm');
         const nascimentoInput = document.getElementById('nascimento');
         const idadeInput = document.getElementById('idade');
         const mensagem = document.getElementById('mensagem');
         const listaVagas = document.getElementById('listaVagas');
+        const erroVagas = document.getElementById('erroVagas');
+        const botaoCadastro = form.querySelector('button[type="submit"]');
 
-        // Criar vagas infantis (15 para cada idade de 5 a 15)
-        let vagasInfantil = {};
-        for (let i = 5; i <= 15; i++) {
-            vagasInfantil[i] = 15;
+        const MAX_VAGAS_INFANTIL = 15;
+        const MAX_VAGAS_ADULTO = 35;
+
+        function calcularIdade(dataNascimento) {
+            const hoje = new Date();
+            const nascimento = new Date(dataNascimento);
+            let idade = hoje.getFullYear() - nascimento.getFullYear();
+            const mes = hoje.getMonth() - nascimento.getMonth();
+            if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) idade--;
+            return idade;
         }
 
-        // Vagas adultos
-        let vagasAdulto = 35;
+        async function atualizarListaVagas() {
+            let vagasInfantil = {};
+            for (let i = 5; i <= 15; i++) vagasInfantil[i] = MAX_VAGAS_INFANTIL;
+            let vagasAdulto = MAX_VAGAS_ADULTO;
 
-        // Função para atualizar a lista de vagas
-        function atualizarListaVagas() {
+            const { data: inscritos, error } = await supabase.from('inscricoes').select('idade');
+            if (error) {
+                console.error("Erro ao buscar inscritos:", error.message);
+                erroVagas.textContent = "Não foi possível carregar as vagas.";
+                return;
+            } else {
+                erroVagas.textContent = "";
+            }
+
+            inscritos.forEach(inscrito => {
+                const idade = inscrito.idade;
+                if (idade >= 5 && idade <= 15) vagasInfantil[idade]--;
+                else if (idade >= 16) vagasAdulto--;
+            });
+
             listaVagas.innerHTML = "";
             for (let i = 5; i <= 15; i++) {
                 listaVagas.innerHTML += `<li>Infantil ${i} anos: <span>${vagasInfantil[i]}</span> vagas</li>`;
             }
             listaVagas.innerHTML += `<li>Adulto (16+): <span>${vagasAdulto}</span> vagas</li>`;
-        }
 
-        // Atualiza idade
-        nascimentoInput.addEventListener('change', function () {
-            const hoje = new Date();
-            const nascimento = new Date(this.value);
-            let idade = hoje.getFullYear() - nascimento.getFullYear();
-            const mes = hoje.getMonth() - nascimento.getMonth();
-
-            if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
-                idade--;
+            const todasInfantilEsgotadas = Object.values(vagasInfantil).every(v => v <= 0);
+            const adultoEsgotado = vagasAdulto <= 0;
+            if (todasInfantilEsgotadas && adultoEsgotado) {
+                botaoCadastro.disabled = true;
+                botaoCadastro.textContent = "Inscrições encerradas";
+            } else {
+                botaoCadastro.disabled = false;
+                botaoCadastro.textContent = "Cadastrar";
             }
 
-            idadeInput.value = idade;
+            return { vagasInfantil, vagasAdulto };
+        }
+
+        nascimentoInput.addEventListener('change', function () {
+            idadeInput.value = calcularIdade(this.value);
         });
 
-        form.addEventListener('submit', function (e) {
+        form.addEventListener('submit', async function (e) {
             e.preventDefault();
 
             const nome = document.getElementById('nome').value;
             const telefone = document.getElementById('telefone').value;
-            const idade = parseInt(document.getElementById('idade').value);
+            const nascimento = document.getElementById('nascimento').value;
+            const idade = calcularIdade(nascimento);
             const sexo = document.getElementById('sexo').value;
             const camiseta = document.getElementById('camiseta').value;
 
-            if (!idade || idade <= 0) {
-                mensagem.textContent = "Informe uma data de nascimento válida.";
-                return;
-            }
-
-            if (idade >= 5 && idade <= 15) {
-                if (vagasInfantil[idade] > 0) {
-                    vagasInfantil[idade]--;
-                } else {
-                    mensagem.textContent = `Inscrição para ${idade} anos está encerrada.`;
-                    return;
-                }
-            } else if (idade >= 16) {
-                if (vagasAdulto > 0) {
-                    vagasAdulto--;
-                } else {
-                    mensagem.textContent = "Inscrição para categoria Adulto (16+) está encerrada.";
-                    return;
-                }
-            } else {
+            if (!idade || idade < 5) {
                 mensagem.textContent = "A idade mínima para inscrição é 5 anos.";
                 return;
             }
 
-            console.log("Cadastro Realizado:", { nome, telefone, idade, sexo, camiseta });
+            const { vagasInfantil, vagasAdulto } = await atualizarListaVagas();
+
+            if (idade >= 5 && idade <= 15 && vagasInfantil[idade] <= 0) {
+                mensagem.textContent = `Inscrição para ${idade} anos está encerrada.`;
+                return;
+            } else if (idade >= 16 && vagasAdulto <= 0) {
+                mensagem.textContent = "Inscrição para categoria Adulto (16+) está encerrada.";
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('inscricoes')
+                .insert([{ nome, telefone, nascimento, idade, sexo, camiseta }]);
+
+            if (error) {
+                mensagem.textContent = "Erro ao enviar inscrição: " + error.message;
+                return;
+            }
+
             alert("Cadastro realizado com sucesso!");
             form.reset();
             idadeInput.value = "";
             mensagem.textContent = "";
 
-            atualizarListaVagas(); // Atualiza quadro de vagas após cadastro
+            await atualizarListaVagas();
         });
 
-        atualizarListaVagas(); // Inicializa lista de vagas
+        atualizarListaVagas();
     </script>
 </body>
 </html>
