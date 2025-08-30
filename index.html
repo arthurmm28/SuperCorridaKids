@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro Corrida</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 800px;
+            display: flex;
+            gap: 20px;
+        }
+
+        form {
+            flex: 1;
+        }
+
+        .vagas {
+            flex: 1;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+
+        h2, h3 {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .alerta {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .vagas ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .vagas li {
+            padding: 5px 0;
+            font-weight: bold;
+        }
+
+        .vagas span {
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <form id="cadastroForm">
+            <h2>Cadastro Corrida</h2>
+
+            <label for="nome">Nome:</label>
+            <input type="text" id="nome" name="nome" required>
+
+            <label for="telefone">Telefone:</label>
+            <input type="tel" id="telefone" name="telefone" required>
+
+            <label for="nascimento">Data de Nascimento:</label>
+            <input type="date" id="nascimento" name="nascimento" required>
+
+            <label for="idade">Idade:</label>
+            <input type="number" id="idade" name="idade" readonly>
+
+            <label for="sexo">Sexo:</label>
+            <select id="sexo" name="sexo" required>
+                <option value="">Selecione</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+                <option value="Outro">Outro</option>
+            </select>
+
+            <label for="camiseta">Tamanho da camiseta:</label>
+            <select id="camiseta" name="camiseta" required>
+                <option value="">Selecione</option>
+                <option value="PP">PP</option>
+                <option value="P">P</option>
+                <option value="M">M</option>
+                <option value="G">G</option>
+                <option value="GG">GG</option>
+            </select>
+
+            <button type="submit">Cadastrar</button>
+            <p id="mensagem" class="alerta"></p>
+        </form>
+
+        <div class="vagas">
+            <h3>Vagas Restantes</h3>
+            <ul id="listaVagas">
+                <!-- Vagas serão atualizadas via JS -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('cadastroForm');
+        const nascimentoInput = document.getElementById('nascimento');
+        const idadeInput = document.getElementById('idade');
+        const mensagem = document.getElementById('mensagem');
+        const listaVagas = document.getElementById('listaVagas');
+
+        // Criar vagas infantis (15 para cada idade de 5 a 15)
+        let vagasInfantil = {};
+        for (let i = 5; i <= 15; i++) {
+            vagasInfantil[i] = 15;
+        }
+
+        // Vagas adultos
+        let vagasAdulto = 35;
+
+        // Função para atualizar a lista de vagas
+        function atualizarListaVagas() {
+            listaVagas.innerHTML = "";
+            for (let i = 5; i <= 15; i++) {
+                listaVagas.innerHTML += `<li>Infantil ${i} anos: <span>${vagasInfantil[i]}</span> vagas</li>`;
+            }
+            listaVagas.innerHTML += `<li>Adulto (16+): <span>${vagasAdulto}</span> vagas</li>`;
+        }
+
+        // Atualiza idade
+        nascimentoInput.addEventListener('change', function () {
+            const hoje = new Date();
+            const nascimento = new Date(this.value);
+            let idade = hoje.getFullYear() - nascimento.getFullYear();
+            const mes = hoje.getMonth() - nascimento.getMonth();
+
+            if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+                idade--;
+            }
+
+            idadeInput.value = idade;
+        });
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const nome = document.getElementById('nome').value;
+            const telefone = document.getElementById('telefone').value;
+            const idade = parseInt(document.getElementById('idade').value);
+            const sexo = document.getElementById('sexo').value;
+            const camiseta = document.getElementById('camiseta').value;
+
+            if (!idade || idade <= 0) {
+                mensagem.textContent = "Informe uma data de nascimento válida.";
+                return;
+            }
+
+            if (idade >= 5 && idade <= 15) {
+                if (vagasInfantil[idade] > 0) {
+                    vagasInfantil[idade]--;
+                } else {
+                    mensagem.textContent = `Inscrição para ${idade} anos está encerrada.`;
+                    return;
+                }
+            } else if (idade >= 16) {
+                if (vagasAdulto > 0) {
+                    vagasAdulto--;
+                } else {
+                    mensagem.textContent = "Inscrição para categoria Adulto (16+) está encerrada.";
+                    return;
+                }
+            } else {
+                mensagem.textContent = "A idade mínima para inscrição é 5 anos.";
+                return;
+            }
+
+            console.log("Cadastro Realizado:", { nome, telefone, idade, sexo, camiseta });
+            alert("Cadastro realizado com sucesso!");
+            form.reset();
+            idadeInput.value = "";
+            mensagem.textContent = "";
+
+            atualizarListaVagas(); // Atualiza quadro de vagas após cadastro
+        });
+
+        atualizarListaVagas(); // Inicializa lista de vagas
+    </script>
+</body>
+</html>
